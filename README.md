@@ -1,7 +1,7 @@
 # Employee Tracker — SAST Training Application
 
 A Spring Boot REST API built for the **T-04 SAST Vulnerability Remediation** workshop.  
-The application works correctly from a business perspective, but contains **five deliberate SAST vulnerabilities** for you to find and fix.
+The application works correctly from a business perspective, but contains **eight deliberate SAST vulnerabilities** for you to find and fix.
 
 ---
 
@@ -26,6 +26,9 @@ Each area contains at least one security vulnerability flagged by a SAST scanner
 | V3 | Hardcoded Secret | `AuthService.java` | CWE-798 |
 | V4 | Sensitive Data in Logs | `AuthController.java` | CWE-532 |
 | V5 | Path Traversal | `ReportController.java` | CWE-22 |
+| V6 | Verbose Error Disclosure | `GlobalExceptionHandler.java` | CWE-209 |
+| V7 | Insecure Direct Object Reference | `EmployeeController.java` | CWE-639 |
+| V8 | Reflected XSS | `StatusController.java` | CWE-79 |
 
 ---
 
@@ -97,7 +100,7 @@ Expected output:
 
 ```
 BUILD SUCCESSFUL
-8 tests completed, 0 failures
+12 tests completed, 0 failures
 ```
 
 > **Do not modify any test file.** The tests describe the correct behaviour of the application. When you fix a vulnerability, the tests must still pass.
@@ -146,6 +149,22 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 > Watch the console after login — you will see the password printed in the log. That is **Vulnerability V4**.
 
+### Get employee profile (sensitive fields — V7)
+
+```bash
+curl http://localhost:8080/api/employees/1/profile
+```
+
+> Returns salary and national ID with no authorization check. That is **Vulnerability V7**.
+
+### Status page (V8)
+
+```bash
+curl "http://localhost:8080/api/status?message=Hello"
+```
+
+> Try injecting `<script>alert(1)</script>` as the message value in a browser. That is **Vulnerability V8**.
+
 ---
 
 ## 6. H2 database console
@@ -172,8 +191,10 @@ sast-tracker/
     │   │   ├── SastTrackerApplication.java
     │   │   ├── controller/
     │   │   │   ├── AuthController.java       ← V4 Sensitive logging
-    │   │   │   ├── EmployeeController.java
-    │   │   │   └── ReportController.java     ← V5 Path traversal
+    │   │   │   ├── EmployeeController.java   ← V7 IDOR (profile endpoint)
+    │   │   │   ├── GlobalExceptionHandler.java ← V6 Verbose error disclosure
+    │   │   │   ├── ReportController.java     ← V5 Path traversal
+    │   │   │   └── StatusController.java     ← V8 Reflected XSS
     │   │   ├── model/
     │   │   ├── repository/
     │   │   └── service/

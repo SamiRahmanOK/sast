@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 
@@ -75,5 +76,25 @@ class EmployeeControllerTest {
         mvc.perform(get("/api/employees/search").param("name", "nobody"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void getProfile_returnsProfile() throws Exception {
+        Employee emp = new Employee("Alice Smith", "Engineer", "alice@example.com", LocalDate.of(2026, 12, 1));
+        emp.setSalary(new BigDecimal("95000"));
+        emp.setNationalId("NI-123456");
+        Employee saved = repo.save(emp);
+
+        mvc.perform(get("/api/employees/" + saved.getId() + "/profile"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Alice Smith"))
+                .andExpect(jsonPath("$.salary").value(95000))
+                .andExpect(jsonPath("$.nationalId").value("NI-123456"));
+    }
+
+    @Test
+    void getProfile_notFound_returns404() throws Exception {
+        mvc.perform(get("/api/employees/9999/profile"))
+                .andExpect(status().isNotFound());
     }
 }
