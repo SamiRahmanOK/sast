@@ -2,12 +2,7 @@
 
 ## Status
 
-All eight README findings have been remediated with focused changes. The test suite passes:
-
-```text
-12 tests completed, 0 failures
-BUILD SUCCESSFUL
-```
+The eight README findings and their application changes are summarized below.
 
 ## Remediation summary
 
@@ -19,7 +14,7 @@ BUILD SUCCESSFUL
 | V4 | Sensitive Data in Logs (CWE-532) | Login credentials and request data are not logged. | `src/main/java/.../controller/AuthController.java` |
 | V5 | Path Traversal (CWE-22) | The normalized path and its resolved real path must remain under the real report directory. Download names use only the final path component. | `src/main/java/.../controller/ReportController.java` |
 | V6 | Verbose Error Disclosure (CWE-209) | Clients receive a generic error and correlation ID; diagnostic details remain server-side. | `src/main/java/.../controller/GlobalExceptionHandler.java` |
-| V7 | IDOR (CWE-639) | The public profile response contains only non-sensitive fields. Salary and national ID are not exposed through this endpoint. | `src/main/java/.../controller/EmployeeController.java`; `src/test/java/.../EmployeeControllerTest.java` |
+| V7 | IDOR (CWE-639) | Employee endpoints return explicit response types that omit salary and national ID. Public creation also uses a request type that does not bind those fields. | `src/main/java/.../controller/EmployeeController.java` |
 | V8 | Reflected XSS (CWE-79) | The message is HTML-escaped and the response includes a restrictive Content-Security-Policy header. | `src/main/java/.../controller/StatusController.java` |
 
 ## Detailed developer summary
@@ -63,7 +58,7 @@ BUILD SUCCESSFUL
 ### V7 — Insecure Direct Object Reference
 
 - **What the vulnerability means:** Anyone could change an employee ID in the URL and retrieve another employee's salary and national ID without proving they were allowed to see them.
-- **How the change solves it:** The public profile endpoint now returns only ordinary profile fields. Sensitive fields are not exposed through that endpoint, so changing the ID cannot disclose them.
+- **How the change solves it:** The public profile returns only ID and name. Create, list, search, and get-by-ID also return explicit response types rather than database entities, so none can include salary or national ID. Public create requests do not bind those fields to the database entity.
 - **Developer notes:** This is intentional data minimization, not a complete private-profile authorization system. If salary or national ID must later be displayed, add real authentication and enforce an owner or administrator authorization rule on the server. Never treat the presence of an arbitrary request header as authentication.
 
 ### V8 — Reflected XSS
@@ -78,7 +73,7 @@ BUILD SUCCESSFUL
 - No arbitrary `Authorization` header is treated as proof of identity.
 - No predictable fallback secret is used.
 - BCrypt is provided through Spring dependency injection using the smaller `spring-security-crypto` dependency; the application does not enable a global `permitAll` security filter.
-- Sensitive employee fields remain in the persistence model for future protected administrative functionality, but are excluded from the public profile response.
+- Salary and national ID remain in the persistence model but are excluded from all public employee responses.
 
 ## Files changed or created
 
@@ -94,10 +89,6 @@ BUILD SUCCESSFUL
 - `src/main/java/com/accenture/sast/tracker/controller/GlobalExceptionHandler.java`
 - `src/main/java/com/accenture/sast/tracker/controller/StatusController.java`
 
-### Test files
-
-- `src/test/java/com/accenture/sast/tracker/EmployeeControllerTest.java`
-
 ### Removed files
 
 - `src/main/java/com/accenture/sast/tracker/config/SecurityConfig.java` — removed because it permitted every request and disabled CSRF without providing authentication.
@@ -111,4 +102,8 @@ Run:
 .\gradlew.bat build
 ```
 
-The existing profile test was updated to verify that sensitive fields are not returned. A future private profile feature should use Spring Security authentication and an explicit owner/admin authorization rule.
+The V7 API response fields are:
+
+- Profile: `id` and `name`.
+- Create, list, search, and get-by-ID: `id`, `name`, `role`, `email`, and `onboardingDate`.
+
