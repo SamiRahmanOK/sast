@@ -1,9 +1,5 @@
 # SAST Remediation Completion Report
 
-## Status
-
-The eight README findings and their application changes are summarized below.
-
 ## Remediation summary
 
 | ID | Finding | Remediation | Relevant files |
