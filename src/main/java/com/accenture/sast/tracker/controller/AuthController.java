@@ -2,6 +2,7 @@ package com.accenture.sast.tracker.controller;
 
 import com.accenture.sast.tracker.service.AuthService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -14,6 +15,11 @@ public class AuthController {
 
     public AuthController(AuthService authService) {
         this.authService = authService;
+    }
+
+    @GetMapping("/csrf")
+    public CsrfToken csrf(CsrfToken token) {
+        return token;
     }
 
     @PostMapping("/register")

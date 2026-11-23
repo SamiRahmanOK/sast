@@ -10,7 +10,7 @@
 | V4 | Sensitive Data in Logs (CWE-532) | Login credentials and request data are not logged. | `src/main/java/.../controller/AuthController.java` |
 | V5 | Path Traversal (CWE-22) | The normalized path and its resolved real path must remain under the real report directory. Download names use only the final path component. | `src/main/java/.../controller/ReportController.java` |
 | V6 | Verbose Error Disclosure (CWE-209) | Clients receive a generic error and correlation ID; diagnostic details remain server-side. | `src/main/java/.../controller/GlobalExceptionHandler.java` |
-| V7 | IDOR (CWE-639) | Employee endpoints return explicit response types that omit salary and national ID. Public creation also uses a request type that does not bind those fields. | `src/main/java/.../controller/EmployeeController.java` |
+| V7 | IDOR (CWE-639) | Public employee responses omit salary and national ID. A separate private-profile route checks the authenticated account's employee link or HR permission before returning private data. | `src/main/java/.../controller/EmployeeController.java`; `src/main/java/.../controller/AuthController.java`; `src/main/java/.../service/AuthService.java`; `src/main/java/.../model/AppUser.java`; `src/main/java/.../config/ProfileSecurityConfig.java` (created); `build.gradle`; `src/main/resources/application.properties` |
 | V8 | Reflected XSS (CWE-79) | The message is HTML-escaped and the response includes a restrictive Content-Security-Policy header. | `src/main/java/.../controller/StatusController.java` |
 
 ## Detailed developer summary
@@ -53,9 +53,10 @@
 
 ### V7 — Insecure Direct Object Reference
 
-- **What the vulnerability means:** Anyone could change an employee ID in the URL and retrieve another employee's salary and national ID without proving they were allowed to see them.
-- **How the change solves it:** The public profile returns only ID and name. Create, list, search, and get-by-ID also return explicit response types rather than database entities, so none can include salary or national ID. Public create requests do not bind those fields to the database entity.
-- **Developer notes:** This is intentional data minimization, not a complete private-profile authorization system. If salary or national ID must later be displayed, add real authentication and enforce an owner or administrator authorization rule on the server. Never treat the presence of an arbitrary request header as authentication.
+- **What the vulnerability means:** Previously, anyone could change the employee ID in the URL and see another person's salary and national ID. Knowing an ID is not proof that someone is allowed to see that person's private information.
+- **How the change solves it:** Public employee responses do not include salary or national ID. A separate `/api/employees/{id}/private-profile` endpoint checks who is signed in and whether they are allowed to see the requested employee before returning private information.
+- **Who can see what:** A signed-in employee linked to the requested record can see their own salary, but not their national ID. A user with HR permission can see salary and national ID for any employee. An unsigned-in request receives `401`; a signed-in user without permission receives `403`.
+- **Developer notes:** Use `/api/auth/session` to sign in: first obtain a token from `/api/auth/csrf`, then send that token and the session cookie with the sign-in request. The older `/api/auth/login` only checks credentials; it does not create a signed-in session. A trusted operator must link an account to an employee or grant HR permission; public registration cannot do either. There is currently no provisioning screen or command, and the in-memory database is cleared when the application restarts.
 
 ### V8 — Reflected XSS
 
@@ -65,10 +66,10 @@
 
 ## Design decisions
 
-- The application does not claim to authenticate users until a complete authentication flow is implemented.
+- The private profile uses Spring Security sessions. The existing public routes keep their previous behavior.
 - No arbitrary `Authorization` header is treated as proof of identity.
 - No predictable fallback secret is used.
-- BCrypt is provided through Spring dependency injection using the smaller `spring-security-crypto` dependency; the application does not enable a global `permitAll` security filter.
+- BCrypt remains an injected password encoder. The security filter chain is scoped to the private profile, session endpoints, and H2 console.
 - Salary and national ID remain in the persistence model but are excluded from all public employee responses.
 
 ## Files changed or created
@@ -77,6 +78,8 @@
 
 - `build.gradle`
 - `src/main/java/com/accenture/sast/tracker/config/PasswordConfig.java`
+- `src/main/java/com/accenture/sast/tracker/config/ProfileSecurityConfig.java` (created)
+- `src/main/java/com/accenture/sast/tracker/model/AppUser.java`
 - `src/main/java/com/accenture/sast/tracker/service/AuthService.java`
 - `src/main/java/com/accenture/sast/tracker/service/EmployeeService.java`
 - `src/main/java/com/accenture/sast/tracker/controller/AuthController.java`
@@ -84,6 +87,7 @@
 - `src/main/java/com/accenture/sast/tracker/controller/ReportController.java`
 - `src/main/java/com/accenture/sast/tracker/controller/GlobalExceptionHandler.java`
 - `src/main/java/com/accenture/sast/tracker/controller/StatusController.java`
+- `src/main/resources/application.properties`
 
 ### Removed files
 
@@ -102,4 +106,5 @@ The V7 API response fields are:
 
 - Profile: `id` and `name`.
 - Create, list, search, and get-by-ID: `id`, `name`, `role`, `email`, and `onboardingDate`.
+- Private profile: `id`, `name`, and `salary` for the owner; HR may also receive `nationalId`.
 
